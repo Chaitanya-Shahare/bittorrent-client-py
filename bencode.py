@@ -9,8 +9,9 @@
 #     dict[bytes,*] for dictionaries
 #
 # Usage:
-#     from bencode import decode
+#     from bencode import decode, encode
 #     obj = decode(b"4:spam")
+#     bencode = encode(obj)
 
 class BencodeError(Exception):
     """Generic bencode parsing error."""
@@ -160,6 +161,42 @@ def decode(data: bytes):
     """Convenience top-level API: decode bencoded bytes into Python objects."""
     return BencodeDecoder(data).decode()
 
+def encode(obj) -> bytes:
+    """
+    Encode Python objects into bencode format.
+
+    Supports: int, bytes, list, dict
+    """
+    if isinstance(obj, int):
+        # Integer: i<number>e
+        return b"i" + str(obj).encode('ascii') + b"e"
+
+    elif isinstance(obj, bytes):
+        # Bytestring: <length>:<data>
+        return str(len(obj)).encode('ascii') + b":" + obj
+
+    elif isinstance(obj, list):
+        # List: l<items>e
+        result = b"l"
+        for item in obj:
+            result += encode(item)
+        result += b"e"
+        return result
+
+    elif isinstance(obj, dict):
+        # Dictionary: d<key><value>...e
+        # IMPORTANT: keys must be sorted!
+        result = b"d"
+        for key in sorted(obj.keys()):
+            result += encode(key)
+            result += encode(obj[key])
+        result += b"e"
+        return result
+
+    else:
+        raise TypeError(f"Cannot bencode object of type {type(obj)}")
+
+
 
 # Optional: quick manual tests if run as a script
 if __name__ == "__main__":
@@ -194,3 +231,18 @@ if __name__ == "__main__":
         b"d3:bar4:spam3:fooi42ee",
         {b"bar": b"spam", b"foo": 42},
     )
+
+    print("\n=== encode/decode round-trip tests ===")
+    # Test that encode(decode(x)) == x
+    test_cases = [
+        b"i42e",
+        b"4:spam",
+        b"li1ei2ei3ee",
+        b"d3:bar4:spam3:fooi42ee",
+    ]
+    for test in test_cases:
+        decoded = decode(test)
+        encoded = encode(decoded)
+        match = encoded == test
+        print(f"{test!r} -> decode -> encode -> {encoded!r} | {'OK' if match else 'FAIL'}")
+
