@@ -39,6 +39,7 @@ A high-performance BitTorrent client with optimized choking/unchoking algorithms
 - **torrent_meta.py** - Torrent file loader
 - **tracker_http.py** - HTTP tracker communication
 - **peer_protocol.py** - BitTorrent peer wire protocol
+- **file_manager.py** - Multi-file torrent support
 - **download.py** - Basic download logic
 
 ### Optimized Components
@@ -158,6 +159,16 @@ Run `python3 benchmark.py <torrent> <pieces>` to see results on your system.
 4. **Optimistic Discovery**
    - Periodically test new peers
    - Find better connections over time
+
+## Features
+
+✅ Single-file torrent support
+✅ Multi-file torrent support (automatically creates directory structure)
+✅ Optimized choking/unchoking algorithms
+✅ Multi-peer downloading
+✅ Bandwidth tracking and statistics
+✅ Piece verification (SHA-1)
+✅ Auto-organized downloads directory
 
 ## Known Limitations
 

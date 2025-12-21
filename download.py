@@ -18,6 +18,7 @@ from pathlib import Path
 from peer_protocol import *
 from tracker_http import *
 from torrent_meta import load_torrent
+from file_manager import FileManager
 
 
 BLOCK_SIZE = 16384  # 16 KB - standard block size
@@ -208,22 +209,25 @@ def download_file(torrent_path: str, output_path: str = None, max_pieces: int = 
     info_hash = calculate_info_hash(info)
     peer_id = generate_peer_id()
 
-    file_name = info[b'name'].decode('utf-8')
-    total_length = info[b'length']
+    # Use FileManager to handle both single and multi-file torrents
+    file_manager = FileManager(info, DOWNLOADS_DIR)
+    file_info = file_manager.get_file_info()
+
+    total_length = file_info['total_length']
     piece_length = info[b'piece length']
     pieces_hashes = info[b'pieces']  # Concatenated 20-byte SHA-1 hashes
 
-    # Auto-generate output path if not provided
-    if output_path is None:
-        # Create downloads directory if it doesn't exist
-        Path(DOWNLOADS_DIR).mkdir(exist_ok=True)
-        output_path = os.path.join(DOWNLOADS_DIR, file_name)
-        print(f"Auto-generated output path: {output_path}")
-
-    print(f"File: {file_name}")
-    print(f"Size: {total_length:,} bytes ({total_length / (1024*1024):.2f} MB)")
+    # Display torrent info
+    print(f"Name: {file_info['root_name']}")
+    print(f"Type: {'Multi-file' if file_info['is_multi_file'] else 'Single-file'} torrent")
+    print(f"Total size: {total_length:,} bytes ({total_length / (1024*1024):.2f} MB)")
     print(f"Piece length: {piece_length:,} bytes")
     print(f"Info hash: {info_hash.hex()}")
+
+    if file_info['is_multi_file']:
+        file_manager.print_file_list()
+
+    print(f"\nWill save to: {file_manager.get_output_summary()}")
 
     # Calculate number of pieces
     num_pieces = (total_length + piece_length - 1) // piece_length
@@ -317,16 +321,19 @@ def download_file(torrent_path: str, output_path: str = None, max_pieces: int = 
             progress = downloaded_bytes / total_length * 100
             print(f"Progress: {downloaded_bytes:,}/{total_length:,} bytes ({progress:.1f}%)\n")
 
-    # Write to file
-    print(f"Writing to {output_path}...")
-    with open(output_path, 'wb') as f:
-        for piece in downloaded_pieces:
-            f.write(piece)
+    # Write to file(s)
+    print(f"\nWriting downloaded data...")
 
-    final_size = sum(len(p) for p in downloaded_pieces)
+    # Convert list to dict for FileManager
+    pieces_dict = {i: downloaded_pieces[i] for i in range(len(downloaded_pieces))}
+    bytes_written = file_manager.write_pieces(pieces_dict, piece_length)
+
     print(f"\n✓ Download complete!")
-    print(f"  File: {output_path}")
-    print(f"  Size: {final_size:,} bytes ({final_size / (1024*1024):.2f} MB)")
+    print(f"  Location: {file_manager.get_output_summary()}")
+    print(f"  Size: {bytes_written:,} bytes ({bytes_written / (1024*1024):.2f} MB)")
+
+    if file_info['is_multi_file']:
+        print(f"  Files: {file_info['file_count']}")
 
 
 if __name__ == "__main__":

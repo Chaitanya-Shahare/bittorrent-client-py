@@ -23,6 +23,7 @@ from peer_protocol import *
 from tracker_http import *
 from torrent_meta import load_torrent
 from peer_manager import PeerManager, PeerStats
+from file_manager import FileManager
 
 
 BLOCK_SIZE = 16384  # 16 KB
@@ -48,15 +49,14 @@ class OptimizedDownloader:
         # Extract metadata
         self.info_hash = calculate_info_hash(self.info)
         self.peer_id = generate_peer_id()
-        self.file_name = self.info[b'name'].decode('utf-8')
-        self.total_length = self.info[b'length']
+
+        # Use FileManager for both single and multi-file torrents
+        self.file_manager = FileManager(self.info, DOWNLOADS_DIR)
+        self.file_info = self.file_manager.get_file_info()
+
+        self.total_length = self.file_info['total_length']
         self.piece_length = self.info[b'piece length']
         self.pieces_hashes = self.info[b'pieces']
-
-        # Auto-generate output path if needed
-        if self.output_path is None:
-            Path(DOWNLOADS_DIR).mkdir(exist_ok=True)
-            self.output_path = os.path.join(DOWNLOADS_DIR, self.file_name)
 
         # Calculate pieces
         self.num_pieces = (self.total_length + self.piece_length - 1) // self.piece_length
@@ -328,22 +328,23 @@ class OptimizedDownloader:
         return False
 
     def save_file(self):
-        """Save downloaded pieces to file."""
-        print(f"\nWriting to {self.output_path}...")
-        with open(self.output_path, 'wb') as f:
-            for piece_idx in sorted(self.pieces_data.keys()):
-                f.write(self.pieces_data[piece_idx])
-
-        total_size = sum(len(p) for p in self.pieces_data.values())
-        print(f"✓ Saved {total_size:,} bytes")
+        """Save downloaded pieces to file(s)."""
+        print(f"\nWriting downloaded data...")
+        bytes_written = self.file_manager.write_pieces(self.pieces_data, self.piece_length)
+        print(f"✓ Saved {bytes_written:,} bytes")
 
     def run(self):
         """Main download orchestration."""
         print("=== Optimized BitTorrent Downloader ===\n")
-        print(f"File: {self.file_name}")
+        print(f"Name: {self.file_info['root_name']}")
+        print(f"Type: {'Multi-file' if self.file_info['is_multi_file'] else 'Single-file'} torrent")
         print(f"Size: {self.total_length:,} bytes ({self.total_length / (1024*1024):.2f} MB)")
         print(f"Pieces: {self.num_pieces}")
-        print(f"Output: {self.output_path}")
+
+        if self.file_info['is_multi_file']:
+            self.file_manager.print_file_list()
+
+        print(f"\nWill save to: {self.file_manager.get_output_summary()}")
 
         self.start_time = time.time()
 
