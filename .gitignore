@@ -28,3 +28,7 @@ dist/
 
 # Environment variables
 .env
+
+# Downloaded files
+downloads/
+*.bin

@@ -25,11 +25,27 @@ A minimal BitTorrent client implementation in Python using only standard library
 # Test tracker communication
 python3 tracker_http.py
 
-# Download a file
-python3 download.py <torrent_file> <output_file> [max_pieces]
+# Download a file (auto-saves to downloads/ directory)
+python3 download.py <torrent_file>
 
-# Example: Download first 5 pieces
+# Download with custom output path
+python3 download.py <torrent_file> <output_file>
+
+# Download only first N pieces (for testing)
+python3 download.py <torrent_file> [output_file] <max_pieces>
+
+# Examples:
+python3 download.py ubuntu.torrent
+# → Saves to: downloads/ubuntu-24.04.3-live-server-amd64.iso
+
+python3 download.py ubuntu.torrent 5
+# → Downloads first 5 pieces to: downloads/ubuntu-24.04.3-live-server-amd64.iso
+
+python3 download.py ubuntu.torrent custom.iso
+# → Saves to: custom.iso
+
 python3 download.py ubuntu.torrent test.bin 5
+# → Downloads first 5 pieces to: test.bin
 ```
 
 ## How It Works

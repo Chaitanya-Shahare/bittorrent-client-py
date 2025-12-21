@@ -13,12 +13,15 @@
 import socket
 import hashlib
 import time
+import os
+from pathlib import Path
 from peer_protocol import *
 from tracker_http import *
 from torrent_meta import load_torrent
 
 
 BLOCK_SIZE = 16384  # 16 KB - standard block size
+DOWNLOADS_DIR = "downloads"  # Directory for downloaded files
 
 
 def download_piece(peer_ip: str, peer_port: int, info_hash: bytes,
@@ -185,13 +188,13 @@ def verify_piece(piece_data: bytes, expected_hash: bytes) -> bool:
     return actual_hash == expected_hash
 
 
-def download_file(torrent_path: str, output_path: str, max_pieces: int = None):
+def download_file(torrent_path: str, output_path: str = None, max_pieces: int = None):
     """
     Download complete file from torrent.
 
     Args:
     - torrent_path: Path to .torrent file
-    - output_path: Where to save downloaded file
+    - output_path: Where to save downloaded file (optional, auto-generated if not provided)
     - max_pieces: Limit number of pieces to download (for testing)
     """
     print(f"=== BitTorrent Downloader ===\n")
@@ -209,6 +212,13 @@ def download_file(torrent_path: str, output_path: str, max_pieces: int = None):
     total_length = info[b'length']
     piece_length = info[b'piece length']
     pieces_hashes = info[b'pieces']  # Concatenated 20-byte SHA-1 hashes
+
+    # Auto-generate output path if not provided
+    if output_path is None:
+        # Create downloads directory if it doesn't exist
+        Path(DOWNLOADS_DIR).mkdir(exist_ok=True)
+        output_path = os.path.join(DOWNLOADS_DIR, file_name)
+        print(f"Auto-generated output path: {output_path}")
 
     print(f"File: {file_name}")
     print(f"Size: {total_length:,} bytes ({total_length / (1024*1024):.2f} MB)")
@@ -324,14 +334,33 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print("Usage: python download.py <torrent_file> [output_file] [max_pieces]")
-        print("\nExample:")
-        print("  python download.py ubuntu.torrent ubuntu.iso")
-        print("  python download.py ubuntu.torrent test.bin 5  # Download only first 5 pieces")
+        print("\nExamples:")
+        print("  python download.py ubuntu.torrent")
+        print("    → Downloads to: downloads/ubuntu-24.04.3-live-server-amd64.iso")
+        print()
+        print("  python download.py ubuntu.torrent custom_name.iso")
+        print("    → Downloads to: custom_name.iso")
+        print()
+        print("  python download.py ubuntu.torrent output.bin 5")
+        print("    → Downloads only first 5 pieces to: output.bin")
         sys.exit(1)
 
     torrent_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else "downloaded_file.bin"
-    max_pieces = int(sys.argv[3]) if len(sys.argv) > 3 else None
+
+    # Parse arguments - handle both [output_file] and [max_pieces] or [output_file, max_pieces]
+    output_file = None
+    max_pieces = None
+
+    if len(sys.argv) > 2:
+        # Check if second argument is a number (max_pieces only)
+        try:
+            max_pieces = int(sys.argv[2])
+            output_file = None  # Auto-generate
+        except ValueError:
+            # It's an output file
+            output_file = sys.argv[2]
+            if len(sys.argv) > 3:
+                max_pieces = int(sys.argv[3])
 
     try:
         download_file(torrent_file, output_file, max_pieces)
